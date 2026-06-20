@@ -82,37 +82,38 @@ function AuthScreen({ onLogin }) {
     }}>
       <div style={{
         background: p.lavCard, border: `1.5px solid ${p.border}`,
-        borderRadius: 20, padding: "32px 30px", maxWidth: 300, width: "100%",
+        borderRadius: 24, padding: "48px 48px", maxWidth: 440, width: "100%",
         boxShadow: "0 8px 32px rgba(155,127,204,0.15)",
+        boxSizing: "border-box",
       }}>
-        <div style={{ textAlign: "center", marginBottom: 22 }}>
-          <div style={{ fontSize: 36, marginBottom: 6, lineHeight: 1 }}>🧬</div>
-          <div style={{ fontSize: 19, fontWeight: 800, color: p.deep, letterSpacing: "-0.02em", lineHeight: 1.2 }}>Life OS</div>
-          <div style={{ fontSize: 12, color: p.muted, marginTop: 4 }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ fontSize: 40, marginBottom: 8, lineHeight: 1 }}>🧬</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: p.deep, letterSpacing: "-0.02em", lineHeight: 1.2 }}>Life OS</div>
+          <div style={{ fontSize: 13, color: p.muted, marginTop: 5 }}>
             {mode === "signin" ? "Welcome back ✦" : "Let's set up your space 🌙"}
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: p.muted, display: "block", marginBottom: 6, lineHeight: 1 }}>Email</label>
+            <label style={{ fontSize: 12, fontWeight: 700, color: p.muted, display: "block", marginBottom: 6, lineHeight: 1 }}>Email</label>
             <input
               type="email" required value={email} onChange={e => setEmail(e.target.value)}
               style={{
-                display: "block", width: "100%", background: p.lavSoft, border: `1.5px solid ${p.lavMid}`,
-                borderRadius: 10, padding: "0 14px", fontSize: 13, color: p.text,
-                fontFamily: "inherit", outline: "none", height: 38, lineHeight: "38px",
+                boxSizing: "border-box", display: "block", width: "100%", background: p.lavSoft, border: `1.5px solid ${p.lavMid}`,
+                borderRadius: 10, padding: "0 16px", fontSize: 14, color: p.text,
+                fontFamily: "inherit", outline: "none", height: 42, lineHeight: "42px",
               }}
             />
           </div>
           <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: p.muted, display: "block", marginBottom: 6, lineHeight: 1 }}>Password</label>
+            <label style={{ fontSize: 12, fontWeight: 700, color: p.muted, display: "block", marginBottom: 6, lineHeight: 1 }}>Password</label>
             <input
               type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)}
               style={{
-                display: "block", width: "100%", background: p.lavSoft, border: `1.5px solid ${p.lavMid}`,
-                borderRadius: 10, padding: "0 14px", fontSize: 13, color: p.text,
-                fontFamily: "inherit", outline: "none", height: 38, lineHeight: "38px",
+                boxSizing: "border-box", display: "block", width: "100%", background: p.lavSoft, border: `1.5px solid ${p.lavMid}`,
+                borderRadius: 10, padding: "0 16px", fontSize: 14, color: p.text,
+                fontFamily: "inherit", outline: "none", height: 42, lineHeight: "42px",
               }}
             />
           </div>
@@ -129,16 +130,16 @@ function AuthScreen({ onLogin }) {
           )}
 
           <button type="submit" disabled={loading} style={{
-            width: "100%", padding: "10px", borderRadius: 10, border: "none",
-            background: p.purple, color: p.white, fontSize: 13, fontWeight: 700,
+            boxSizing: "border-box", width: "100%", padding: "0", borderRadius: 10, border: "none",
+            background: p.purple, color: p.white, fontSize: 14, fontWeight: 700,
             cursor: loading ? "default" : "pointer", opacity: loading ? 0.7 : 1,
-            height: 40,
+            height: 44, marginTop: 6,
           }}>
             {loading ? "..." : mode === "signin" ? "Sign in" : "Create account"}
           </button>
         </form>
 
-        <div style={{ textAlign: "center", marginTop: 16, fontSize: 12, color: p.muted }}>
+        <div style={{ textAlign: "center", marginTop: 18, fontSize: 13, color: p.muted }}>
           {mode === "signin" ? (
             <>New here? <button onClick={() => { setMode("signup"); setError(""); setInfo(""); }} style={{ background: "none", border: "none", color: p.purple, fontWeight: 700, cursor: "pointer", fontSize: 12 }}>Create an account</button></>
           ) : (
