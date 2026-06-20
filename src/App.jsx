@@ -28,6 +28,30 @@ function todayStr() { return new Date().toISOString().slice(0, 10); }
 function monthLabel(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 function quarterLabel(d = new Date()) { return `Q${Math.ceil((d.getMonth() + 1) / 3)} ${d.getFullYear()}`; }
 
+const ENERGY_META = [
+  null,
+  { label: "Exhausted", emoji: "🌑", color: "#C86B7A", bg: "#FAE8EC" },
+  { label: "Very Low",  emoji: "🌒", color: "#C4904A", bg: "#FAF0DC" },
+  { label: "Low",       emoji: "🌓", color: "#B8A040", bg: "#F8F4DC" },
+  { label: "Okay",      emoji: "🌔", color: "#7ABFB0", bg: "#E4F4F1" },
+  { label: "Good",      emoji: "🌕", color: "#7AAFD4", bg: "#E4F0FA" },
+  { label: "Great",     emoji: "🌕", color: "#9B7FCC", bg: "#EDE6F7" },
+  { label: "Energized", emoji: "⭐", color: "#C4964A", bg: "#FAF0DC" },
+  { label: "Thriving",  emoji: "✨", color: "#D4889A", bg: "#F9EEF2" },
+  { label: "Radiant",   emoji: "🌟", color: "#7ABFB0", bg: "#E4F4F1" },
+  { label: "Peak",      emoji: "🌈", color: "#9B7FCC", bg: "#EDE6F7" },
+];
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function last8Months() {
+  const out = [];
+  const now = new Date();
+  for (let i = 7; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push({ label: monthLabel(d), month: d.getMonth(), year: d.getFullYear() });
+  }
+  return out;
+}
+
 // ── shared bits ───────────────────────────────────────────────
 function Card({ children, style = {} }) {
   return <div style={{ background: p.lavCard, border: `1.5px solid ${p.border}`, borderRadius: 18, padding: "20px 22px", marginBottom: 16, ...style }}>{children}</div>;
@@ -498,7 +522,6 @@ function WealthHub({ userId, flash }) {
 const VISION_DEFAULTS = [
   { area_key: "consulting", label: "Consulting Business", icon: "🏢", color: p.purple, bg: p.lavSoft },
   { area_key: "spanish", label: "Spanish", icon: "🇪🇸", color: p.gold, bg: p.goldSoft },
-  { area_key: "korean", label: "Korean", icon: "🇰🇷", color: p.rose, bg: p.pinkSoft },
   { area_key: "compound", label: "Family Compound", icon: "🏡", color: p.mint, bg: p.mintSoft },
 ];
 function FutureVisionHub({ userId, flash }) {
@@ -553,7 +576,7 @@ function FutureVisionHub({ userId, flash }) {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
         {VISION_DEFAULTS.map(def => {
           const area = areas[def.area_key];
           if (!area) return null;
@@ -830,22 +853,19 @@ function MonthlyHub({ userId, flash }) {
   }
 
   if (loading) return <Loading />;
-  const energyColors = ["#C86B7A", "#C4904A", "#B8A040", "#7ABFB0", "#7AAFD4", "#9B7FCC", "#C4964A", "#D4889A", "#7ABFB0", "#9B7FCC"];
 
   return (
     <div>
       <Card style={{ background: p.lavSoft }}>
         <Label icon="🔋" text="Monthly Energy Score" color={p.deep} />
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-          {[1,2,3,4,5,6,7,8,9,10].map(n => (
-            <button key={n} onClick={() => save({ energy_score: n })} style={{
-              width: 32, height: 32, borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 800,
-              background: form.energy_score === n ? energyColors[n-1] : p.lavMid,
-              color: form.energy_score === n ? "#fff" : p.muted,
-            }}>{n}</button>
-          ))}
+        <div style={{ fontSize: 12, color: p.text, lineHeight: 1.6 }}>
+          {form.energy_score ? (
+            <>This month's score: <strong style={{ color: ENERGY_META[form.energy_score].color }}>{ENERGY_META[form.energy_score].emoji} {form.energy_score} · {ENERGY_META[form.energy_score].label}</strong></>
+          ) : (
+            <>Not set yet for this month.</>
+          )}
         </div>
-        <div style={{ fontSize: 11, color: p.muted }}>1 = depleted · 10 = peak energy this month</div>
+        <div style={{ fontSize: 11, color: p.muted, marginTop: 6 }}>Set or update this in the 🔋 Energy Tracker hub — it has the full monthly chart and pattern insights.</div>
       </Card>
 
       <Card>
@@ -881,6 +901,142 @@ function MonthlyHub({ userId, flash }) {
             <TextField value={form[f.key]} onChange={e => setForm(x => ({ ...x, [f.key]: e.target.value }))} onBlur={() => save({ [f.key]: form[f.key] })} />
           </div>
         ))}
+      </Card>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// ENERGY TRACKER HUB
+// ════════════════════════════════════════════════════════════
+function EnergyHub({ userId, flash }) {
+  const [loading, setLoading] = useState(true);
+  const [scores, setScores] = useState({}); // month_label -> energy_score
+  const [selected, setSelected] = useState(null);
+  const months = last8Months();
+  const currentLabel = monthLabel();
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase.from("monthly_reviews").select("month_label, energy_score").eq("user_id", userId);
+      const map = {};
+      (data || []).forEach(r => { if (r.energy_score) map[r.month_label] = r.energy_score; });
+      setScores(map);
+      setLoading(false);
+    }
+    load();
+  }, [userId]);
+
+  async function setScore(monthLbl, score) {
+    setScores(s => ({ ...s, [monthLbl]: score }));
+    await supabase.from("monthly_reviews").upsert({ user_id: userId, month_label: monthLbl, energy_score: score }, { onConflict: "user_id,month_label" });
+    flash();
+  }
+
+  if (loading) return <Loading />;
+
+  const filled = months.map(m => scores[m.label]).filter(v => v != null);
+  const avg = filled.length ? (filled.reduce((a, b) => a + b, 0) / filled.length).toFixed(1) : "—";
+  const best = filled.length ? Math.max(...filled) : null;
+  const currentScore = scores[currentLabel];
+  const recent = months.slice(-3).map(m => scores[m.label]).filter(v => v != null);
+  const recentAvg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : null;
+  const trend = (recentAvg != null && filled.length > recent.length)
+    ? recentAvg - (filled.reduce((a, b) => a + b, 0) / filled.length)
+    : null;
+
+  const patterns = [];
+  if (recentAvg != null && parseFloat(avg) && recentAvg < parseFloat(avg) - 1) patterns.push({ icon: "🌒", text: "Energy trending down lately — protect your rest this month.", color: p.rose });
+  if (recentAvg != null && parseFloat(avg) && recentAvg > parseFloat(avg) + 1) patterns.push({ icon: "🌟", text: "You're on an upswing! Notice what's working.", color: p.mint });
+  if (filled.filter(s => s <= 3).length >= 2) patterns.push({ icon: "💜", text: "Multiple low-energy months — consider reviewing your load.", color: p.pink });
+  if (patterns.length === 0) patterns.push({ icon: "🌙", text: "Energy is steady. Consistency is its own kind of strength.", color: p.lavDeep });
+
+  const BAR_MAX = 110;
+  const sel = selected ? scores[selected] : null;
+  const selMonth = months.find(m => m.label === selected);
+
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
+        <Card style={{ background: p.lavSoft, marginBottom: 0, padding: "12px 14px" }}>
+          <div style={{ fontSize: 9, fontWeight: 800, color: p.purple }}>8-MONTH AVG</div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: p.deep }}>{avg}</div>
+        </Card>
+        <Card style={{ background: "#EDE6F7", marginBottom: 0, padding: "12px 14px" }}>
+          <div style={{ fontSize: 9, fontWeight: 800, color: p.deep }}>THIS MONTH</div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: p.deep }}>{currentScore ? `${ENERGY_META[currentScore].emoji} ${currentScore}` : "—"}</div>
+        </Card>
+        <Card style={{ background: p.goldSoft, marginBottom: 0, padding: "12px 14px" }}>
+          <div style={{ fontSize: 9, fontWeight: 800, color: p.gold }}>BEST MONTH</div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: p.deep }}>{best ? `⭐ ${best}` : "—"}</div>
+        </Card>
+      </div>
+
+      <Card>
+        <Label icon="📊" text="8-Month Overview" color={p.deep} />
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: BAR_MAX + 36, paddingBottom: 26 }}>
+          {months.map(m => {
+            const score = scores[m.label];
+            const meta = score ? ENERGY_META[score] : null;
+            const h = score ? (score / 10) * BAR_MAX : 4;
+            const isCurrent = m.label === currentLabel;
+            const isSelected = m.label === selected;
+            return (
+              <div key={m.label} onClick={() => setSelected(isSelected ? null : m.label)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer" }}>
+                <div style={{
+                  width: "100%", height: h,
+                  background: score ? (isSelected ? meta.color : meta.color + "AA") : p.lavMid,
+                  borderRadius: "8px 8px 4px 4px",
+                  border: isCurrent ? `2px dashed ${p.purple}` : "none",
+                  marginBottom: 4, transition: "all 0.2s",
+                }} />
+                <div style={{ fontSize: 9, fontWeight: isCurrent ? 800 : 500, color: isCurrent ? p.deep : p.muted, marginTop: 4 }}>{MONTH_NAMES[m.month]}</div>
+                <div style={{ fontSize: 10, marginTop: 1 }}>{meta ? meta.emoji : "·"}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {selected && (
+          <div style={{ marginTop: 8, background: sel ? ENERGY_META[sel].bg : p.lavSoft, border: `1.5px solid ${sel ? ENERGY_META[sel].color + "55" : p.lavMid}`, borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: sel ? ENERGY_META[sel].color : p.muted, marginBottom: 8 }}>
+              {sel ? `${ENERGY_META[sel].emoji} ${MONTH_NAMES[selMonth.month]} ${selMonth.year} · ${ENERGY_META[sel].label}` : `${MONTH_NAMES[selMonth.month]} ${selMonth.year} · not set yet`}
+            </div>
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+              {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                <button key={n} onClick={() => setScore(selected, n)} style={{
+                  width: 32, height: 32, borderRadius: 9, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 800,
+                  background: sel === n ? ENERGY_META[n].color : p.lavMid,
+                  color: sel === n ? "#fff" : p.muted,
+                }}>{n}</button>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <Label icon="🌙" text="Score Guide" color={p.deep} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 6 }}>
+          {ENERGY_META.slice(1).map((m, i) => (
+            <div key={i} style={{ background: m.bg, border: `1px solid ${m.color}44`, borderRadius: 10, padding: "8px", textAlign: "center" }}>
+              <div style={{ fontSize: 15 }}>{m.emoji}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: m.color }}>{i + 1}</div>
+              <div style={{ fontSize: 8, color: p.muted, marginTop: 2 }}>{m.label}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card style={{ background: `linear-gradient(135deg, #EDE6F7, #F9EEF2)`, marginBottom: 0 }}>
+        <Label icon="💜" text="Pattern Insights" color={p.rose} />
+        {patterns.map((pt, i) => (
+          <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", background: p.lavCard, borderRadius: 10, padding: "10px 12px", border: `1px solid ${pt.color}33`, marginBottom: 6 }}>
+            <span style={{ fontSize: 15 }}>{pt.icon}</span>
+            <span style={{ fontSize: 12, color: p.text, lineHeight: 1.5 }}>{pt.text}</span>
+          </div>
+        ))}
+        <div style={{ fontSize: 11, color: p.muted, marginTop: 10 }}>Tap any bar above to set or update that month's score.</div>
       </Card>
     </div>
   );
@@ -988,6 +1144,7 @@ const NAV = [
   { id: "health", icon: "💪", label: "Health" },
   { id: "career", icon: "🚀", label: "Career" },
   { id: "wealth", icon: "💰", label: "Wealth" },
+  { id: "energy", icon: "🔋", label: "Energy Tracker" },
   { id: "future", icon: "✨", label: "Future Vision" },
   { id: "wins", icon: "⭐", label: "Wins Archive" },
   { id: "relationships", icon: "🤝", label: "Relationships" },
@@ -1008,6 +1165,7 @@ function AppShell({ session, onLogout }) {
     health: <HealthHub userId={userId} flash={flash} />,
     career: <CareerHub userId={userId} flash={flash} />,
     wealth: <WealthHub userId={userId} flash={flash} />,
+    energy: <EnergyHub userId={userId} flash={flash} />,
     future: <FutureVisionHub userId={userId} flash={flash} />,
     wins: <WinsHub userId={userId} flash={flash} />,
     relationships: <RelationshipsHub userId={userId} flash={flash} />,
