@@ -82,7 +82,7 @@ function AuthScreen({ onLogin }) {
     }}>
       <div style={{
         background: p.lavCard, border: `1.5px solid ${p.border}`,
-        borderRadius: 20, padding: "32px 28px", maxWidth: 360, width: "100%",
+        borderRadius: 20, padding: "32px 30px", maxWidth: 300, width: "100%",
         boxShadow: "0 8px 32px rgba(155,127,204,0.15)",
       }}>
         <div style={{ textAlign: "center", marginBottom: 22 }}>
